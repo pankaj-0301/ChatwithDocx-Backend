@@ -40,6 +40,7 @@ app.use(express.json());
 // app.use(express.json({ limit: '100mb' })); // Set to desired limit
 
 app.use(cors());
+app.use(express.timeout(1200000)); // Increase request timeout to 2 minutes
 
   
 
@@ -61,7 +62,7 @@ const Chunk = mongoose.model("Chunk", chunkSchema);
 // Configure multer for file uploads
 const upload = multer({
     dest: "uploads/",
-    limits: { fileSize: 10 * 1024 * 1024 } // Limit to 10 MB
+    limits: { fileSize: 100 * 1024 * 1024 } // Limit to 10 MB
 });
 
 // Endpoint to handle file uploads, parsing, embedding, and storing
