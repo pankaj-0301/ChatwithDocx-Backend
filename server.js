@@ -123,7 +123,7 @@ app.post("/upload", upload.array("files", 10), async (req, res) => {
                     embedding: embeddingsArray[i]
                 });
                 await newChunk.save();
-                console.log(Chunk from ${file.originalname} saved with embedding.);
+                console.log(`Chunk from ${file.originalname} saved with embedding.`);
             }
 
             // Push the chunks for this file into the result array
