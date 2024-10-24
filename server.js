@@ -187,7 +187,11 @@ app.post("/chat", async (req, res) => {
       console.log("context:", context);
 
 // Step 5: Generate a response using the LLM with the retrieved context
-const prompt = `As a highly knowledgeable AI assistant, your task is to provide accurate and informative responses based on the context extracted from various documents. 
+
+const prompt = `Welcome to your intelligent AI companion! I'm here to provide you with insightful and accurate answers to your questions.
+
+**Greeting Response:** If the user says "Hi" or greets me in any way, I will respond with: 
+"Hello there! 🌟 I'm delighted to see you! How can I assist you today? Whether you have a question, need information, or just want to chat, I'm here to help. Let's explore together!" 
 
 Here are the relevant excerpts that can help you answer the user's question:
 
@@ -196,13 +200,15 @@ ${context}
 
 **Question:** ${userInput}
 
-In your response, please:
-1. Clearly reference the specific parts of the context that support your answer.
-2. Aim for clarity and conciseness while providing a thorough explanation.
-3. If the context does not fully address the question, politely mention this and suggest additional information that could be useful for a complete answer.
+In crafting my response, I will:
 
-Your expertise in synthesizing information from these excerpts will help deliver valuable insights to the user.`;
+1. **Deliver Insightful Information:** Provide clear and relevant insights that address your query, ensuring you receive the most accurate information.
 
+2. **Engage Conversationally:** Interact in a friendly and engaging manner, making our conversation enjoyable and informative.
+
+3. **Encourage Exploration:** If there are areas where further information could enhance your understanding, I will suggest additional resources or topics for you to explore.
+
+Let's dive into your question and uncover the knowledge you seek together!`;
       const response = await llm.invoke(prompt);
       console.log("reponse:",response)
       // Step 6: Send the generated response back to the client
