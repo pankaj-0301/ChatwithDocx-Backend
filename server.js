@@ -9,8 +9,6 @@ const path = require("path");
 const mongoose = require("mongoose");
 const { ChatOpenAI } = require("@langchain/openai"); // Import ChatOpenAI
 const cors = require("cors"); // Import CORS
-const pdfParse = require("pdf-parse");
-const timeout = require('connect-timeout');
 
 require('dotenv').config();
 
@@ -38,10 +36,7 @@ const llm = new ChatOpenAI({
 const app = express();
 const PORT = 5000;
 app.use(express.json());
-// app.use(express.json({ limit: '100mb' })); // Set to desired limit
-
 app.use(cors());
-app.use(timeout(1200000)); // Increase request timeout to 2 minutes
 
   
 
@@ -61,13 +56,9 @@ const chunkSchema = new mongoose.Schema({
 const Chunk = mongoose.model("Chunk", chunkSchema);
 
 // Configure multer for file uploads
-const upload = multer({
-    dest: "uploads/",
-    limits: { fileSize: 100 * 1024 * 1024 } // Limit to 10 MB
-});
+const upload = multer({ dest: "uploads/" });
 
 // Endpoint to handle file uploads, parsing, embedding, and storing
-
 app.post("/upload", upload.array("files", 10), async (req, res) => {
     try {
         if (!req.files || req.files.length === 0) {
@@ -82,27 +73,28 @@ app.post("/upload", upload.array("files", 10), async (req, res) => {
             console.log("File path:", filePath);
 
             let loader;
-            let content = "";
 
             // Step 1: Determine the file type (DOCX or PDF) and use the appropriate loader
             if (path.extname(file.originalname).toLowerCase() === ".docx") {
-                loader = new DocxLoader(filePath);
-                console.log("Loading DOCX document...");
-                const docs = await loader.load();
-                if (docs.length > 0) {
-                    content = docs[0].pageContent; // Extract text content from the DOCX file
-                    console.log("Document content:", content);
-                }
+              loader = new DocxLoader(filePath);
+              console.log("Loading DOCX document...");
             } else if (path.extname(file.originalname).toLowerCase() === ".pdf") {
-                console.log("Loading PDF document...");
-                const pdfBuffer = fs.readFileSync(filePath);
-                const pdfData = await pdfParse(pdfBuffer);
-                content = pdfData.text; // Extract text content from the PDF
-                console.log("Document content:", content);
+              loader = new PDFLoader(filePath);
+              console.log("Loading PDF document...");
             } else {
-                // If the file format is not supported, skip it
-                console.log("Unsupported file format:", file.originalname);
-                continue;
+              // If the file format is not supported, skip it
+              console.log("Unsupported file format:", file.originalname);
+              continue;
+            }
+
+            // Load the document
+            const docs = await loader.load();
+            console.log("Document loaded:", docs);
+
+            let content = "";
+            if (docs.length > 0) {
+                content = docs[0].pageContent; // Extract text content from the DOCX file
+                console.log("Document content:", content);
             }
 
             // Cleanup: delete the uploaded file after processing
@@ -131,7 +123,7 @@ app.post("/upload", upload.array("files", 10), async (req, res) => {
                     embedding: embeddingsArray[i]
                 });
                 await newChunk.save();
-                console.log(`Chunk from ${file.originalname} saved with embedding.`);
+                console.log(Chunk from ${file.originalname} saved with embedding.);
             }
 
             // Push the chunks for this file into the result array
@@ -190,34 +182,25 @@ app.post("/chat", async (req, res) => {
       }
 
       // Step 4: Format the context for the prompt
-      const context = similarChunks.map(item => `${item.chunk.fileName}: ${item.chunk.chunk}`).join("\n");
+      const context = similarChunks.map(item => ${item.chunk.fileName}: ${item.chunk.chunk}).join("\n");
       console.log("context:", context);
 
 // Step 5: Generate a response using the LLM with the retrieved context
-const prompt = `Welcome to your intelligent AI companion! I'm here to provide you with insightful and accurate answers to your questions.
-
-**Greeting Response:** If the user says "Hi" or greets me in any way, I will respond with: 
-"Hello there! 🌟 I'm delighted to see you! How can I assist you today? Whether you have a question, need information, or just want to chat, I'm here to help. Let's explore together!" 
+const prompt = `As a highly knowledgeable AI assistant, your task is to provide accurate and informative responses based on the context extracted from various documents. 
 
 Here are the relevant excerpts that can help you answer the user's question:
 
-Documents:
+Context:
 ${context}
 
-**Question:** ${userInput}
+*Question:* ${userInput}
 
-In crafting my response, I will:
+In your response, please:
+1. Clearly reference the specific parts of the context that support your answer.
+2. Aim for clarity and conciseness while providing a thorough explanation.
+3. If the context does not fully address the question, politely mention this and suggest additional information that could be useful for a complete answer.
 
-1. **Deliver Insightful Information:** Provide clear and relevant insights that address your query, ensuring you receive the most accurate information based on the documents provided.
-
-2. **Engage Conversationally:** Interact in a friendly and engaging manner, making our conversation enjoyable and informative.
-
-3. **Encourage Exploration:** If there are areas where further information could enhance your understanding, I will suggest additional resources or topics for you to explore.
-
-If I cannot find relevant information in the documents, I will respond with: 
-"Regrettably, I wasn't able to locate any relevant information based on your query within the uploaded files. Kindly share the necessary documents, and I'll be more than happy to assist you further."
-
-Let's dive into your question and uncover the knowledge you seek together!`;
+Your expertise in synthesizing information from these excerpts will help deliver valuable insights to the user.`;
 
       const response = await llm.invoke(prompt);
       console.log("reponse:",response)
@@ -236,5 +219,5 @@ app.get('/', (req, res) => {
 
 // Start the server
 app.listen(PORT, () => {
-    console.log(`Server running on ${PORT}`);
+    console.log(Server running on ${PORT});
 });
