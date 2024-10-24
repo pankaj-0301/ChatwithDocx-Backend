@@ -194,7 +194,7 @@ const prompt = `Welcome to your intelligent AI companion! I'm here to provide yo
 
 Here are the relevant excerpts that can help you answer the user's question:
 
-Context:
+Documents:
 ${context}
 
 **Question:** ${userInput}
