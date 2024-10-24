@@ -37,6 +37,8 @@ const llm = new ChatOpenAI({
 const app = express();
 const PORT = 5000;
 app.use(express.json());
+// app.use(express.json({ limit: '100mb' })); // Set to desired limit
+
 app.use(cors());
 
   
@@ -57,7 +59,10 @@ const chunkSchema = new mongoose.Schema({
 const Chunk = mongoose.model("Chunk", chunkSchema);
 
 // Configure multer for file uploads
-const upload = multer({ dest: "uploads/" });
+const upload = multer({
+    dest: "uploads/",
+    limits: { fileSize: 10 * 1024 * 1024 } // Limit to 10 MB
+});
 
 // Endpoint to handle file uploads, parsing, embedding, and storing
 
