@@ -36,7 +36,13 @@ const llm = new ChatOpenAI({
 const app = express();
 const PORT = 5000;
 app.use(express.json());
-app.use(cors());
+// app.use(cors());
+const corsOptions = {
+  origin: 'https://lawminds-codebase.vercel.app', // Allow your frontend domain
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+};
+
+app.use(cors(corsOptions));
 
   
 
