@@ -1,4 +1,4 @@
-const express = require("express");
+onst express = require("express");
 const multer = require("multer");
 const { DocxLoader } = require("@langchain/community/document_loaders/fs/docx");
 const { PDFLoader } = require("@langchain/community/document_loaders/fs/pdf");
@@ -36,13 +36,7 @@ const llm = new ChatOpenAI({
 const app = express();
 const PORT = 5000;
 app.use(express.json());
-// app.use(cors());
-const corsOptions = {
-  origin: 'https://lawminds-codebase.vercel.app', // Allow your frontend domain
-  methods: ['GET', 'POST', 'PUT', 'DELETE'],
-};
-
-app.use(cors(corsOptions));
+app.use(cors());
 
   
 
