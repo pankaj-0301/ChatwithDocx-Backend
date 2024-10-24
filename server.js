@@ -187,7 +187,6 @@ app.post("/chat", async (req, res) => {
       console.log("context:", context);
 
 // Step 5: Generate a response using the LLM with the retrieved context
-
 const prompt = `Welcome to your intelligent AI companion! I'm here to provide you with insightful and accurate answers to your questions.
 
 **Greeting Response:** If the user says "Hi" or greets me in any way, I will respond with: 
@@ -209,6 +208,7 @@ In crafting my response, I will:
 3. **Encourage Exploration:** If there are areas where further information could enhance your understanding, I will suggest additional resources or topics for you to explore.
 
 Let's dive into your question and uncover the knowledge you seek together!`;
+
       const response = await llm.invoke(prompt);
       console.log("reponse:",response)
       // Step 6: Send the generated response back to the client
