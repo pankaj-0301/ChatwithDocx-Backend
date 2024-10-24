@@ -9,6 +9,7 @@ const path = require("path");
 const mongoose = require("mongoose");
 const { ChatOpenAI } = require("@langchain/openai"); // Import ChatOpenAI
 const cors = require("cors"); // Import CORS
+const pdfParse = require("pdf-parse");
 
 require('dotenv').config();
 
@@ -59,6 +60,7 @@ const Chunk = mongoose.model("Chunk", chunkSchema);
 const upload = multer({ dest: "uploads/" });
 
 // Endpoint to handle file uploads, parsing, embedding, and storing
+
 app.post("/upload", upload.array("files", 10), async (req, res) => {
     try {
         if (!req.files || req.files.length === 0) {
@@ -73,28 +75,27 @@ app.post("/upload", upload.array("files", 10), async (req, res) => {
             console.log("File path:", filePath);
 
             let loader;
+            let content = "";
 
             // Step 1: Determine the file type (DOCX or PDF) and use the appropriate loader
             if (path.extname(file.originalname).toLowerCase() === ".docx") {
-              loader = new DocxLoader(filePath);
-              console.log("Loading DOCX document...");
+                loader = new DocxLoader(filePath);
+                console.log("Loading DOCX document...");
+                const docs = await loader.load();
+                if (docs.length > 0) {
+                    content = docs[0].pageContent; // Extract text content from the DOCX file
+                    console.log("Document content:", content);
+                }
             } else if (path.extname(file.originalname).toLowerCase() === ".pdf") {
-              loader = new PDFLoader(filePath);
-              console.log("Loading PDF document...");
-            } else {
-              // If the file format is not supported, skip it
-              console.log("Unsupported file format:", file.originalname);
-              continue;
-            }
-
-            // Load the document
-            const docs = await loader.load();
-            console.log("Document loaded:", docs);
-
-            let content = "";
-            if (docs.length > 0) {
-                content = docs[0].pageContent; // Extract text content from the DOCX file
+                console.log("Loading PDF document...");
+                const pdfBuffer = fs.readFileSync(filePath);
+                const pdfData = await pdfParse(pdfBuffer);
+                content = pdfData.text; // Extract text content from the PDF
                 console.log("Document content:", content);
+            } else {
+                // If the file format is not supported, skip it
+                console.log("Unsupported file format:", file.originalname);
+                continue;
             }
 
             // Cleanup: delete the uploaded file after processing
