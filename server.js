@@ -10,7 +10,7 @@ const mongoose = require("mongoose");
 const { ChatOpenAI } = require("@langchain/openai"); // Import ChatOpenAI
 const cors = require("cors"); // Import CORS
 const pdfParse = require("pdf-parse");
-const timeout = require('connect-timeout');
+// const timeout = require('connect-timeout');
 
 require('dotenv').config();
 
@@ -21,12 +21,12 @@ const embeddings = new AzureOpenAIEmbeddings({
 azureOpenAIApiInstanceName: process.env.AZURE_OAI_API_INSTANCE_NAME, // Use environment variable or replace with your instance name
 azureOpenAIApiEmbeddingsDeploymentName: process.env.AZURE_OAI_API_EMBEDDINGS_DEPLOYMENT_NAME, // Use environment variable or replace with your deployment name
 azureOpenAIApiVersion: process.env.AZURE_OAI_API_EMBED_VERSION, // Use environment variable or replace with your API version
-maxRetries: 1,
+maxRetries: 3,
 });
 
 // Initialize Chat Model with Azure OpenAI API key
 const llm = new ChatOpenAI({
-  temperature: 0.5,
+  temperature: 0.4,
   azureOpenAIApiKey: process.env.AZURE_OAI_API_KEY, // Use environment variable
   azureOpenAIApiInstanceName: process.env.AZURE_OAI_API_INSTANCE_NAME, // Use environment variable
   azureOpenAIApiVersion: process.env.AZURE_OAI_API_CHAT_VERSION, // Ensure this is correct
@@ -41,7 +41,7 @@ app.use(express.json());
 // app.use(express.json({ limit: '100mb' })); // Set to desired limit
 
 app.use(cors());
-app.use(timeout(1200000)); // Increase request timeout to 2 minutes
+// app.use(timeout(1200000)); // Increase request timeout to 2 minutes
 
   
 
