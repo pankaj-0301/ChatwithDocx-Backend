@@ -62,22 +62,24 @@ const llm = new ChatOpenAI({
 // Caching mechanism for embeddings
 let embeddingCache = {};
 
-async function getEmbedding(text) {
+// Function to fetch embedding with exponential backoff on rate limit
+async function getEmbedding(text, attempt = 1) {
     if (embeddingCache[text]) {
         return embeddingCache[text];
     }
-    
+
     try {
         const embedding = await embeddings.embedDocuments([text]);
         embeddingCache[text] = embedding[0]; // Cache the result
         return embedding[0];
     } catch (error) {
-        if (error.response && error.response.status === 429) {
-            console.warn("Rate limit exceeded. Retrying...");
-            await new Promise(resolve => setTimeout(resolve, 5000)); // Wait before retrying
-            return getEmbedding(text); // Retry embedding
+        if (error.response && error.response.status === 429 && attempt < 5) {
+            const waitTime = Math.pow(2, attempt) * 1000; // Exponential backoff
+            console.warn(`Rate limit exceeded. Retrying in ${waitTime / 1000} seconds...`);
+            await new Promise(resolve => setTimeout(resolve, waitTime));
+            return getEmbedding(text, attempt + 1); // Retry embedding
         }
-        throw error; // Re-throw if it's not a rate limit issue
+        throw error; // Re-throw if it's not a rate limit issue or max attempts reached
     }
 }
 
