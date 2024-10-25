@@ -10,7 +10,6 @@ const mongoose = require("mongoose");
 const { ChatOpenAI } = require("@langchain/openai");
 const cors = require("cors");
 const pdfParse = require("pdf-parse");
-const { Readable } = require("stream");
 
 require("dotenv").config();
 
@@ -54,17 +53,17 @@ const upload = multer({
 });
 
 // Helper function to stream content for processing
-const streamFileContent = async (filePath, fileType) => {
+const streamFileContent = async (filePath) => {
   return new Promise((resolve, reject) => {
-    let content = "";
+    const contentChunks = [];
     const stream = fs.createReadStream(filePath, { encoding: "utf8" });
 
     stream.on("data", chunk => {
-      content += chunk;
+      contentChunks.push(chunk);
     });
 
     stream.on("end", () => {
-      resolve(content);
+      resolve(contentChunks.join('')); // Join only when done
     });
 
     stream.on("error", err => {
@@ -83,21 +82,20 @@ app.post("/upload", upload.array("files", 10), async (req, res) => {
 
     for (const file of req.files) {
       const filePath = path.join(__dirname, file.path);
-      let content = "";
+      let content;
 
       if (path.extname(file.originalname).toLowerCase() === ".docx") {
         const loader = new DocxLoader(filePath);
         const docs = await loader.load();
         content = docs.length > 0 ? docs[0].pageContent : "";
       } else if (path.extname(file.originalname).toLowerCase() === ".pdf") {
-        const stream = fs.createReadStream(filePath);
-        const pdfData = await pdfParse(stream);
+        const pdfData = await pdfParse(fs.readFileSync(filePath));
         content = pdfData.text;
       } else {
         content = await streamFileContent(filePath);
       }
 
-      fs.unlinkSync(filePath);
+      fs.unlinkSync(filePath); // Clean up the uploaded file
 
       const splitter = new RecursiveCharacterTextSplitter({
         chunkSize: 1000,
@@ -106,10 +104,9 @@ app.post("/upload", upload.array("files", 10), async (req, res) => {
 
       const chunks = await splitter.splitText(content);
 
-      const batchSize = 5;
-
-      for (let i = 0; i < chunks.length; i += batchSize) {
-        const batchChunks = chunks.slice(i, i + batchSize);
+      // Process chunks in smaller batches
+      for (let i = 0; i < chunks.length; i += 5) {
+        const batchChunks = chunks.slice(i, i + 5);
         const embeddingsArray = await embeddings.embedDocuments(batchChunks);
 
         const chunkDocs = batchChunks.map((chunk, j) => ({
@@ -119,6 +116,11 @@ app.post("/upload", upload.array("files", 10), async (req, res) => {
         }));
 
         await Chunk.insertMany(chunkDocs);
+        
+        // Trigger garbage collection if needed
+        if (i % (5 * 10) === 0) {
+          global.gc(); // Ensure Node.js is running with --expose-gc
+        }
       }
 
       chunksArray.push({
@@ -143,7 +145,8 @@ app.post("/chat", async (req, res) => {
     const cursor = Chunk.find().cursor();
 
     const similarChunks = [];
-    for (let chunk = await cursor.next(); chunk != null; chunk = await cursor.next()) {
+    
+    for (let chunk of await cursor.toArray()) {
       const similarityScore = cosineSimilarity(queryVector, chunk.embedding);
       similarChunks.push({ chunk, similarityScore });
     }
@@ -156,7 +159,12 @@ app.post("/chat", async (req, res) => {
     const prompt = `Documents:\n${context}\n*Question:* ${userInput}`;
 
     const response = await llm.invoke(prompt);
+    
     res.json({ answer: response.content });
+    
+    // Trigger garbage collection after chat processing
+    global.gc();
+    
   } catch (error) {
     console.error("Error processing the chat request:", error);
     res.status(500).send("Failed to process the chat request");
@@ -173,13 +181,11 @@ app.listen(PORT, () => {
 
 // Utility function to calculate cosine similarity
 const cosineSimilarity = (vecA, vecB) => {
-  let dotProduct = 0;
-  let normA = 0;
-  let normB = 0;
-  for (let i = 0; i < vecA.length; i++) {
-    dotProduct += vecA[i] * vecB[i];
-    normA += vecA[i] * vecA[i];
-    normB += vecB[i] * vecB[i];
-  }
-  return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
+  let dotProduct = vecA.reduce((sum, val, i) => sum + val * vecB[i], 0);
+  
+  let normA = Math.sqrt(vecA.reduce((sum, val) => sum + val * val, 0));
+  
+  let normB = Math.sqrt(vecB.reduce((sum, val) => sum + val * val, 0));
+  
+  return dotProduct / (normA * normB);
 };
