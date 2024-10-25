@@ -131,7 +131,7 @@ app.post("/upload", upload.array("files", 10), async (req, res) => {
                     embedding: embeddingsArray[i]
                 });
                 await newChunk.save();
-                console.log(Chunk from ${file.originalname} saved with embedding.);
+                console.log(`Chunk from ${file.originalname} saved with embedding.`);
             }
 
             // Push the chunks for this file into the result array
@@ -190,7 +190,7 @@ app.post("/chat", async (req, res) => {
       }
 
       // Step 4: Format the context for the prompt
-      const context = similarChunks.map(item => ${item.chunk.fileName}: ${item.chunk.chunk}).join("\n");
+      const context = similarChunks.map(item => `${item.chunk.fileName}: ${item.chunk.chunk}`).join("\n");
       console.log("context:", context);
 
 // Step 5: Generate a response using the LLM with the retrieved context
@@ -236,5 +236,5 @@ app.get('/', (req, res) => {
 
 // Start the server
 app.listen(PORT, () => {
-    console.log(Server running on ${PORT});
+    console.log(`Server running on ${PORT}`);
 });
