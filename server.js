@@ -47,7 +47,7 @@ const embeddings = new AzureOpenAIEmbeddings({
     azureOpenAIApiInstanceName: process.env.AZURE_OAI_API_INSTANCE_NAME,
     azureOpenAIApiEmbeddingsDeploymentName: process.env.AZURE_OAI_API_EMBEDDINGS_DEPLOYMENT_NAME,
     azureOpenAIApiVersion: process.env.AZURE_OAI_API_EMBED_VERSION,
-    maxRetries: 1,
+    maxRetries: 6,
 });
 
 // Initialize Chat Model with Azure OpenAI API key
