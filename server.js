@@ -15,15 +15,15 @@ const timeout = require('connect-timeout');
 require('dotenv').config();
 
 
-// Initialize Azure OpenAI embeddings
+// Azure Embeddings setup with retry configuration
 const embeddings = new AzureOpenAIEmbeddings({
-  azureOpenAIApiKey: process.env.AZURE_OAI_API_KEY, // Use environment variable or replace with your key
-azureOpenAIApiInstanceName: process.env.AZURE_OAI_API_INSTANCE_NAME, // Use environment variable or replace with your instance name
-azureOpenAIApiEmbeddingsDeploymentName: process.env.AZURE_OAI_API_EMBEDDINGS_DEPLOYMENT_NAME, // Use environment variable or replace with your deployment name
-azureOpenAIApiVersion: process.env.AZURE_OAI_API_EMBED_VERSION, // Use environment variable or replace with your API version
-maxRetries: 1,
+  azureOpenAIApiKey: process.env.AZURE_OAI_API_KEY,
+  azureOpenAIApiInstanceName: process.env.AZURE_OAI_API_INSTANCE_NAME,
+  azureOpenAIApiEmbeddingsDeploymentName: process.env.AZURE_OAI_API_EMBEDDINGS_DEPLOYMENT_NAME,
+  azureOpenAIApiVersion: process.env.AZURE_OAI_API_EMBED_VERSION,
+  maxRetries: 5,
+  retryAfter: 1000, // Retry after 1 second on rate limit errors
 });
-
 // Initialize Chat Model with Azure OpenAI API key
 const llm = new ChatOpenAI({
   temperature: 0.5,
@@ -124,21 +124,23 @@ app.post("/upload", upload.array("files", 10), async (req, res) => {
             console.log("Generated embeddings:", embeddingsArray);
 
             // Store each chunk and its embedding in MongoDB
-            for (let i = 0; i < chunks.length; i++) {
-                const newChunk = new Chunk({
-                    fileName: file.originalname,
-                    chunk: chunks[i],
-                    embedding: embeddingsArray[i]
-                });
-                await newChunk.save();
-                console.log(`Chunk from ${file.originalname} saved with embedding.`);
-            }
+             for (let i = 0; i < chunks.length; i += 2) {
+        const batch = chunks.slice(i, i + 2);
+        const embeddingsArray = await exponentialBackoff(() => embeddings.embedDocuments(batch));
 
-            // Push the chunks for this file into the result array
-            chunksArray.push({
-                fileName: file.originalname,
-                chunks,
-            });
+        const chunkDocs = batch.map((chunk, idx) => ({
+          fileName: file.originalname,
+          chunk,
+          embedding: embeddingsArray[idx]
+        }));
+        await Chunk.insertMany(chunkDocs);
+      }
+
+            // // Push the chunks for this file into the result array
+            // chunksArray.push({
+            //     fileName: file.originalname,
+            //     chunks,
+            // });
         }
 
         // Return all chunks from all files as a JSON response
