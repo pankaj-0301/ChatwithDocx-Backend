@@ -10,6 +10,7 @@ const mongoose = require("mongoose");
 const { ChatOpenAI } = require("@langchain/openai");
 const cors = require("cors");
 const pdfParse = require("pdf-parse");
+const { PassThrough } = require("stream");
 
 require("dotenv").config();
 
@@ -57,7 +58,6 @@ app.post("/upload", upload.array("files", 10), async (req, res) => {
       return res.status(400).json({ error: "No files were uploaded." });
     }
 
-    const chunksArray = [];
     for (const file of req.files) {
       const filePath = path.join(__dirname, file.path);
       let content = "";
@@ -67,11 +67,13 @@ app.post("/upload", upload.array("files", 10), async (req, res) => {
         const docs = await loader.load();
         content = docs.length > 0 ? docs[0].pageContent : "";
       } else if (path.extname(file.originalname).toLowerCase() === ".pdf") {
-        const pdfBuffer = fs.readFileSync(filePath);
-        const pdfData = await pdfParse(pdfBuffer);
+        const pdfStream = fs.createReadStream(filePath);
+        const pdfData = await pdfParse(pdfStream);
         content = pdfData.text;
       }
-      fs.unlinkSync(filePath);
+      fs.unlink(filePath, (err) => {
+        if (err) console.error("Error deleting file:", err);
+      });
 
       const splitter = new RecursiveCharacterTextSplitter({
         chunkSize: 1000,
@@ -79,7 +81,7 @@ app.post("/upload", upload.array("files", 10), async (req, res) => {
       });
 
       const chunks = await splitter.splitText(content);
-      const batchSize = 5;  // Process chunks in batches to reduce memory usage
+      const batchSize = 5;
 
       for (let i = 0; i < chunks.length; i += batchSize) {
         const batchChunks = chunks.slice(i, i + batchSize);
@@ -91,16 +93,11 @@ app.post("/upload", upload.array("files", 10), async (req, res) => {
           embedding: embeddingsArray[j]
         }));
 
-        await Chunk.insertMany(chunkDocs);  // Insert chunks in bulk
+        await Chunk.insertMany(chunkDocs); 
       }
-
-      chunksArray.push({
-        fileName: file.originalname,
-        chunks,
-      });
     }
 
-    res.json({ files: chunksArray });
+    res.json({ message: "Files processed and uploaded successfully." });
   } catch (error) {
     console.error("Error processing the documents:", error);
     res.status(500).send("Failed to process the files");
@@ -125,21 +122,22 @@ app.post("/chat", async (req, res) => {
     const queryEmbedding = await embeddings.embedDocuments([userInput]);
     const queryVector = queryEmbedding[0];
 
-    const allChunks = await Chunk.find();
+    const cursor = Chunk.find().cursor();
+    const similarChunks = [];
 
-    const similarChunks = allChunks
-      .map(chunk => ({
-        chunk,
-        similarityScore: cosineSimilarity(queryVector, chunk.embedding)
-      }))
-      .sort((a, b) => b.similarityScore - a.similarityScore)
-      .slice(0, 5);
+    for (let chunkDoc = await cursor.next(); chunkDoc != null; chunkDoc = await cursor.next()) {
+      const similarityScore = cosineSimilarity(queryVector, chunkDoc.embedding);
+      similarChunks.push({ chunk: chunkDoc, similarityScore });
+    }
 
-    if (similarChunks.length === 0) {
+    similarChunks.sort((a, b) => b.similarityScore - a.similarityScore);
+    const topChunks = similarChunks.slice(0, 5);
+
+    if (topChunks.length === 0) {
       return res.status(404).json({ error: "No relevant information found." });
     }
 
-    const context = similarChunks.map(item => `${item.chunk.fileName}: ${item.chunk.chunk}`).join("\n");
+    const context = topChunks.map(item => `${item.chunk.fileName}: ${item.chunk.chunk}`).join("\n");
     const prompt = `Documents:\n${context}\n*Question:* ${userInput}`;
 
     const response = await llm.invoke(prompt);
